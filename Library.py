@@ -1,4 +1,6 @@
 import hashlib
+from bson.objectid import ObjectId # Crucial for working with MongoDB IDs
+# Assuming DBManager.py is in the same directory
 from DBManager import DBManager 
 
 class Book:
@@ -16,7 +18,7 @@ class User:
         self.username = username
         self.name = name
         self._id = user_id
-        self.is_admin = is_admin
+        self.is_admin = is_admin # Store the admin status
 
 class LibrarySystem:
     """Manages the overall library operations and interacts with the database."""
@@ -26,6 +28,10 @@ class LibrarySystem:
 
     def verify_login(self, username, password):
         """Checks credentials against the database and sets user type."""
+        if self.db_manager.client is None:
+            print("Database connection is not available. Cannot verify login.")
+            return False
+            
         user_data = self.db_manager.get_user_by_username(username)
         if user_data:
             # Check password (simplified)
@@ -44,26 +50,34 @@ class LibrarySystem:
 
     def get_available_books(self):
         """Returns a list of Book objects."""
+        if self.db_manager.client is None:
+            return []
+            
         book_list = self.db_manager.get_all_books()
+        # MAPPING: Create a list of Book objects from the MongoDB documents
         return [
             Book(
                 title=b['title'], 
                 author=b['author'], 
                 isbn=b['isbn'], 
-                book_id=b['_id'], 
+                book_id=b['_id'], # Store the MongoDB _id
                 is_available=b.get('is_available', True)
             ) 
             for b in book_list if b.get('is_available', True)
         ]
 
     def checkout_book(self, book_id):
-        """Marks a book as unavailable."""
+        """Marks a book as unavailable using its MongoDB ObjectId."""
+        if self.db_manager.client is None:
+            return "Error: Database is offline."
+
         if not self.current_user:
             return "Error: Must be logged in to checkout a book."
         
+        # Use the DBManager method to perform the database update
         if self.db_manager.update_book_status(book_id, False):
-            return f"Book ID {book_id} checked out successfully by {self.current_user.username}."
+            # Success
+            return f"Book checked out successfully by {self.current_user.username}."
         else:
-            return "Error: Could not checkout book."
-
-    # --- Add methods for return_book, register_user, add_book, etc. ---
+            # Failure (e.g., book not found or already checked out)
+            return "Error: Could not checkout book (already unavailable or not found)."
