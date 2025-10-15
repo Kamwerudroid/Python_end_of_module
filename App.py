@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
-from Library import LibrarySystem 
+from bson.objectid import ObjectId # Import ObjectId here too for casting
+from Library import LibrarySystem # Import the business logic
 
 class LibraryApp(tk.Tk):
     """The main application window and frame manager."""
@@ -18,7 +19,8 @@ class LibraryApp(tk.Tk):
         container.grid_columnconfigure(0, weight=1)
 
         self.frames = {}
-        for F in (LoginPage, UserPage, AdminPage): # <-- Add AdminPage
+        # Add AdminPage to the frames list
+        for F in (LoginPage, UserPage, AdminPage): 
             page_name = F.__name__
             frame = F(parent=container, controller=self)
             self.frames[page_name] = frame
@@ -41,7 +43,7 @@ class LibraryApp(tk.Tk):
         else:
             messagebox.showinfo("Success", "User login successful!")
             self.frames["UserPage"].load_user_data()
-            self.show_frame("UserPage")
+            self.show_frame("UserPage") # <-- Navigate to User Page
         
     def logout(self):
         """Clears current user and switches back to LoginPage."""
@@ -73,33 +75,17 @@ class LoginPage(tk.Frame):
         username = self.username_entry.get()
         password = self.password_entry.get()
 
+        if self.controller.library_system.db_manager.client is None:
+            messagebox.showerror("Connection Error", "Could not connect to MongoDB. Please start the database.")
+            return
+
         if self.controller.library_system.verify_login(username, password):
-            messagebox.showinfo("Success", "Login successful!")
+            # Login success handled by controller.login_success (which routes to AdminPage or UserPage)
+            self.username_entry.delete(0, tk.END)
+            self.password_entry.delete(0, tk.END)
             self.controller.login_success()
         else:
             messagebox.showerror("Error", "Invalid username or password.")
-
-class AdminPage(tk.Frame):
-    """The administrative page for managing the library."""
-    def __init__(self, parent, controller):
-        tk.Frame.__init__(self, parent)
-        self.controller = controller
-        
-        # Admin Header
-        tk.Label(self, text="Admin Dashboard", font=('Arial', 24, 'bold')).pack(pady=20)
-        
-        # User Info
-        user = self.controller.library_system.current_user
-        if user:
-            tk.Label(self, text=f"Logged in as: {user.name}", font=('Arial', 14)).pack(pady=5)
-        
-        # Admin Tasks (PLACEHOLDERS)
-        tk.Button(self, text="Add New Book", width=25).pack(pady=10)
-        tk.Button(self, text="Manage Users", width=25).pack(pady=10)
-        tk.Button(self, text="View All Transactions", width=25).pack(pady=10)
-
-        # Logout Button
-        tk.Button(self, text="Logout", command=self.controller.logout).pack(pady=30)            
             
 class UserPage(tk.Frame):
     """The main user page showing available books and user info."""
@@ -132,9 +118,12 @@ class UserPage(tk.Frame):
         self.books_listbox.delete(0, tk.END)
         books = self.controller.library_system.get_available_books()
         
+        if not books:
+             self.books_listbox.insert(tk.END, "No available books found.")
+             return
+
         for book in books:
-            # Store the book ID (or a unique identifier) as part of the listbox item 
-            # for easy retrieval when checking out.
+            # Store the book ID (ObjectId) string in the listbox item
             display_text = f"{book.title} by {book.author} (ISBN: {book.isbn}) | ID: {book._id}"
             self.books_listbox.insert(tk.END, display_text)
 
@@ -143,13 +132,10 @@ class UserPage(tk.Frame):
             selected_index = self.books_listbox.curselection()[0]
             selected_text = self.books_listbox.get(selected_index)
             
-            # Simple way to extract the book ID from the displayed text
-            # This is brittle and should be improved in a production app 
-            # (e.g., storing the ID in a dictionary linked to the listbox index)
+            # Extract the unique ID string from the listbox item
             book_id_str = selected_text.split(" | ID: ")[-1]
             
-            # Assuming MongoDB's ObjectId might be stored as a string
-            from bson.objectid import ObjectId
+            # Cast the ID string back into a MongoDB ObjectId 
             book_id = ObjectId(book_id_str)
 
             result_msg = self.controller.library_system.checkout_book(book_id)
@@ -162,22 +148,36 @@ class UserPage(tk.Frame):
         except IndexError:
             messagebox.showerror("Selection Error", "Please select a book to checkout.")
         except Exception as e:
+            # Catch errors like invalid ObjectId format or connection issues
             messagebox.showerror("Error", f"An error occurred: {e}")
+
+class AdminPage(tk.Frame):
+    """The administrative page for managing the library."""
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent)
+        self.controller = controller
+        
+        # Admin Header
+        tk.Label(self, text="Admin Dashboard", font=('Arial', 24, 'bold')).pack(pady=20)
+        
+        # User Info
+        self.user_info_label = tk.Label(self, text="", font=('Arial', 14))
+        self.user_info_label.pack(pady=5)
+        
+        # Admin Tasks (PLACEHOLDERS)
+        tk.Button(self, text="Add New Book", width=25).pack(pady=10)
+        tk.Button(self, text="Manage Users", width=25).pack(pady=10)
+        tk.Button(self, text="View All Transactions", width=25).pack(pady=10)
+
+        # Logout Button
+        tk.Button(self, text="Logout", command=self.controller.logout).pack(pady=30)
+        
+    def load_admin_data(self):
+         user = self.controller.library_system.current_user
+         if user:
+             self.user_info_label.config(text=f"Logged in as: {user.name}")
 
 
 if __name__ == "__main__":
-    # Ensure you have the `pymongo` package installed: pip install pymongo
-    # And a MongoDB instance running on localhost:27017
-    
-    # --- For initial setup, you might need to insert test data manually ---
-    # Example MongoDB inserts for testing:
-    """
-    db.users.insert_one({"username": "alice", "password": "password123", "name": "Alice Smith"})
-    db.books.insert_many([
-        {"title": "The Great Novel", "author": "J. Doe", "isbn": "12345", "is_available": True},
-        {"title": "Python Programming", "author": "G. Code", "isbn": "67890", "is_available": True}
-    ])
-    """
-    
     app = LibraryApp()
     app.mainloop()
