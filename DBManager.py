@@ -67,8 +67,8 @@ class DBManager:
             print("Error: Database connection failed during initialization.")
             return None 
         
-        # FIX: Use $regex with $options 'i' for case-insensitive match
-        # This allows the query to find 'admin' even if it's stored as 'Admin' or 'ADMIN'.
+        
+        
         query = {"username": {"$regex": f"^{username.strip()}$", "$options": "i"}}
         
         print(f"Querying users collection with case-insensitive query: {query}") 
@@ -79,7 +79,7 @@ class DBManager:
     def get_all_books(self):
         """Fetches all book documents."""
         if self.client is None: return []
-        # find returns a cursor, which we convert to a list
+        
         return list(self.books_collection.find({}))
         
     def update_book_status(self, book_id: ObjectId, new_status: bool):
