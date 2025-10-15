@@ -3,7 +3,7 @@ from pymongo import MongoClient
 
 class DBManager:
     """Manages connection to MongoDB and performs database operations."""
-    def __init__(self, uri="mongodb://localhost:27017/", db_name="LibraryDB"):
+    def __init__(self, uri="mongodb+srv://mainakamweru_db_user:3RQ2CwPYcljoe0cB@cluster0.22s3qwq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0", db_name="LibraryDB"):
         try:
             # Replace with your actual MongoDB URI if it's remote
             self.client = MongoClient(uri)

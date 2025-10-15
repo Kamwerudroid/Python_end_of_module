@@ -18,7 +18,7 @@ class LibraryApp(tk.Tk):
         container.grid_columnconfigure(0, weight=1)
 
         self.frames = {}
-        for F in (LoginPage, UserPage):
+        for F in (LoginPage, UserPage, AdminPage): # <-- Add AdminPage
             page_name = F.__name__
             frame = F(parent=container, controller=self)
             self.frames[page_name] = frame
@@ -32,9 +32,16 @@ class LibraryApp(tk.Tk):
         frame.tkraise()
 
     def login_success(self):
-        """Called after successful login to switch to the UserPage."""
-        self.frames["UserPage"].load_user_data()
-        self.show_frame("UserPage")
+        """Called after successful login to switch to the appropriate page."""
+        user = self.library_system.current_user
+        if user.is_admin:
+            messagebox.showinfo("Success", "Admin login successful!")
+            # self.frames["AdminPage"].load_admin_data() # (Optional) load data for admin
+            self.show_frame("AdminPage") # <-- Navigate to Admin Page
+        else:
+            messagebox.showinfo("Success", "User login successful!")
+            self.frames["UserPage"].load_user_data()
+            self.show_frame("UserPage")
         
     def logout(self):
         """Clears current user and switches back to LoginPage."""
@@ -71,6 +78,28 @@ class LoginPage(tk.Frame):
             self.controller.login_success()
         else:
             messagebox.showerror("Error", "Invalid username or password.")
+
+class AdminPage(tk.Frame):
+    """The administrative page for managing the library."""
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent)
+        self.controller = controller
+        
+        # Admin Header
+        tk.Label(self, text="Admin Dashboard", font=('Arial', 24, 'bold')).pack(pady=20)
+        
+        # User Info
+        user = self.controller.library_system.current_user
+        if user:
+            tk.Label(self, text=f"Logged in as: {user.name}", font=('Arial', 14)).pack(pady=5)
+        
+        # Admin Tasks (PLACEHOLDERS)
+        tk.Button(self, text="Add New Book", width=25).pack(pady=10)
+        tk.Button(self, text="Manage Users", width=25).pack(pady=10)
+        tk.Button(self, text="View All Transactions", width=25).pack(pady=10)
+
+        # Logout Button
+        tk.Button(self, text="Logout", command=self.controller.logout).pack(pady=30)            
             
 class UserPage(tk.Frame):
     """The main user page showing available books and user info."""
