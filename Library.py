@@ -1,6 +1,5 @@
 import hashlib
-from bson.objectid import ObjectId # Crucial for working with MongoDB IDs
-# Assuming DBManager.py is in the same directory
+from bson.objectid import ObjectId
 from DBManager import DBManager 
 
 class Book:
@@ -18,7 +17,7 @@ class User:
         self.username = username
         self.name = name
         self._id = user_id
-        self.is_admin = is_admin # Store the admin status
+        self.is_admin = is_admin 
 
 class LibrarySystem:
     """Manages the overall library operations and interacts with the database."""
@@ -27,32 +26,54 @@ class LibrarySystem:
         self.current_user = None
 
     def verify_login(self, username, password):
-        """Checks credentials against the database and sets user type."""
-        if self.db_manager.client is None:
-            print("Database connection is not available. Cannot verify login.")
-            return False
-            
-        user_data = self.db_manager.get_user_by_username(username)
+        """
+        Checks credentials against the database.
+        Includes logging for debugging.
+        """
+        # Clean inputs to prevent whitespace issues
+        clean_username = username.strip()
+        clean_password = password.strip()
+        
+        print(f"\n--- Login Attempt ---")
+        print(f"Attempting login for user: {clean_username}")
+
+        user_data = self.db_manager.get_user_by_username(clean_username)
+
         if user_data:
-            # Check password (simplified)
-            if user_data.get("password") == password: 
-                # MAPPING: Create a User object with the admin status
-                is_admin_user = user_data.get('is_admin', False) # Default to False if field is missing
-                
+            print(f"User data fetched successfully.")
+            # Retrieve the password from the database document
+            db_password = user_data.get("password")
+            is_admin_user = user_data.get('is_admin', False) 
+            
+            print(f"DB Record Username: {user_data.get('username')}, Admin: {is_admin_user}")
+            print(f"DB Password (from DB): '{db_password}'")
+            print(f"Input Password (from Tkinter): '{clean_password}'")
+            
+            # 1. Check if the password field exists and is not None
+            if db_password is None:
+                 print("Failure: 'password' field missing or None in DB record. Check your MongoDB schema!")
+                 return False
+
+            # 2. Compare the input password with the stored password (case-sensitive)
+            if db_password == clean_password: 
+                print("Success: Password matched.")
+                # MAPPING: Create a User object from the MongoDB dictionary
                 self.current_user = User(
                     username=user_data['username'], 
                     name=user_data.get('name', 'N/A'),
                     user_id=user_data['_id'],
-                    is_admin=is_admin_user # Store the status
+                    is_admin=is_admin_user
                 )
                 return True
-        return False
+            else:
+                print("Failure: Password mismatch.")
+                return False
+        else:
+            print(f"Failure: User '{clean_username}' not found in database.")
+            return False
 
     def get_available_books(self):
         """Returns a list of Book objects."""
-        if self.db_manager.client is None:
-            return []
-            
         book_list = self.db_manager.get_all_books()
         # MAPPING: Create a list of Book objects from the MongoDB documents
         return [
@@ -60,7 +81,7 @@ class LibrarySystem:
                 title=b['title'], 
                 author=b['author'], 
                 isbn=b['isbn'], 
-                book_id=b['_id'], # Store the MongoDB _id
+                book_id=b['_id'], 
                 is_available=b.get('is_available', True)
             ) 
             for b in book_list if b.get('is_available', True)
@@ -68,9 +89,6 @@ class LibrarySystem:
 
     def checkout_book(self, book_id):
         """Marks a book as unavailable using its MongoDB ObjectId."""
-        if self.db_manager.client is None:
-            return "Error: Database is offline."
-
         if not self.current_user:
             return "Error: Must be logged in to checkout a book."
         
